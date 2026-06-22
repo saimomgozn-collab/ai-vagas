@@ -1,0 +1,16 @@
+# Ignorar chaves de API e configurações locais
+.env
+
+# Ignorar ambiente virtual do Python
+.venv/
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Banco de dados local com vagas
+data/*.db
+
+# Arquivos temporários de currículos
+temp_resume.pdf
+temp_*.pdf
