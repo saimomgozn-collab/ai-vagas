@@ -143,6 +143,18 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
                 else:
                     skills_missing.append(kw.capitalize())
                     
+        # Define as dicas de melhoria dinamicamente com base nas skills faltantes
+        if skills_missing:
+            tips = [
+                f"Adicione palavras-chave como {', '.join(skills_missing[:3])} ao seu currículo se tiver experiência.",
+                "Revise a descrição da vaga para mapear requisitos adicionais."
+            ]
+        else:
+            tips = [
+                "Parabéns! Seu currículo cobre as principais competências técnicas identificadas nesta vaga.",
+                "Revise a descrição da vaga para mapear requisitos adicionais de soft skills ou certificações."
+            ]
+            
         return {
             "id": job["id"],
             "title": job["title"],
@@ -154,7 +166,7 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
             "skills_present": skills_present if skills_present else ["Habilidades gerais"],
             "skills_missing": skills_missing if skills_missing else ["Nenhuma habilidade crítica ausente detectada"],
             "justification": f"Esta é uma análise gerada localmente. O candidato possui afinidade aproximada de {score_percentage}% com as palavras-chave da vaga.",
-            "improvement_tips": ["Adicione palavras-chave como " + ", ".join(skills_missing[:3]) + " ao seu currículo se tiver experiência.", "Revise a descrição da vaga para mapear requisitos adicionais."]
+            "improvement_tips": tips
         }
         
     logger.info(f"Gerando análise com IA (Gemini) para a vaga {job['id']}.")
