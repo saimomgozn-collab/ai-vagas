@@ -161,6 +161,8 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
             "company": job["company"],
             "location": job["location"],
             "url": job["url"],
+            "work_type": job.get("work_type", ""),
+            "experience_level": job.get("experience_level", ""),
             "fit_classification": classification,
             "score_percentage": score_percentage,
             "skills_present": skills_present if skills_present else ["Habilidades gerais"],
@@ -208,7 +210,9 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
             "title": job["title"],
             "company": job["company"],
             "location": job["location"],
-            "url": job["url"]
+            "url": job["url"],
+            "work_type": job.get("work_type", ""),
+            "experience_level": job.get("experience_level", "")
         })
         return analysis_data
         
@@ -221,6 +225,8 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
             "company": job["company"],
             "location": job["location"],
             "url": job["url"],
+            "work_type": job.get("work_type", ""),
+            "experience_level": job.get("experience_level", ""),
             "fit_classification": "Fit" if score_est > 0.15 else "No Fit",
             "score_percentage": int(score_est * 100),
             "skills_present": ["Carregamento falhou"],
@@ -229,21 +235,43 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
             "improvement_tips": ["Tente novamente em instantes."]
         }
 
-def match_resume_with_database(resume_text: str, limit: int = 5) -> List[Dict[str, Any]]:
-    """Carrega todas as vagas do banco, faz a triagem inicial e gera a análise detalhada das top N vagas."""
+def match_resume_with_database(resume_text: str, limit: int = 5, filters: dict = None) -> List[Dict[str, Any]]:
+    """Carrega as vagas do banco filtradas, faz a triagem inicial e gera a análise detalhada das top N."""
     conn = sqlite3.connect(config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT id, title, company, location, description, url FROM jobs")
+    
+    # Constrói query SQL dinâmica com base nos filtros aplicados
+    query = "SELECT id, title, company, location, description, url, work_type, experience_level FROM jobs WHERE 1=1"
+    params = []
+    
+    if filters:
+        if filters.get("title"):
+            query += " AND title LIKE ?"
+            params.append(f"%{filters['title']}%")
+        if filters.get("location"):
+            query += " AND location LIKE ?"
+            params.append(f"%{filters['location']}%")
+        if filters.get("company"):
+            query += " AND company LIKE ?"
+            params.append(f"%{filters['company']}%")
+        if filters.get("work_type"):
+            query += " AND work_type LIKE ?"
+            params.append(f"%{filters['work_type']}%")
+        if filters.get("experience_level"):
+            query += " AND experience_level LIKE ?"
+            params.append(f"%{filters['experience_level']}%")
+            
+    cursor.execute(query, params)
     rows = cursor.fetchall()
     conn.close()
     
     if not rows:
-        logger.warning("Nenhuma vaga encontrada no banco de dados para realizar o matching.")
+        logger.warning("Nenhuma vaga correspondente encontrada no banco de dados para realizar o matching.")
         return []
         
     jobs = [dict(row) for row in rows]
-    logger.info(f"Iniciando cruzamento com {len(jobs)} vagas cadastradas no banco de dados.")
+    logger.info(f"Iniciando cruzamento com {len(jobs)} vagas filtradas no banco de dados.")
     
     # 1. Triagem rápida (calcula score de similaridade para todas)
     ranked_jobs = calculate_semantic_similarity(resume_text, jobs)

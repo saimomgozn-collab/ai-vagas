@@ -4,14 +4,14 @@ import pandas as pd
 from pathlib import Path
 from loguru import logger
 
-# Importa as configurações do projeto e o motor de matching
+# Importa as configurações do projeto e o motor de matching/banco
 import config
-from scraper import scrape_jobs, init_db
+from database import import_kaggle_csv, init_db
 from matcher import match_resume_with_database, extract_text_from_pdf, GEMINI_AVAILABLE
 
 # Configuração da página do Streamlit
 st.set_page_config(
-    page_title="AI Vagas - LinkedIn Matcher & Scraper",
+    page_title="AI Vagas - Job Matcher Dashboard",
     page_icon="💼",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -22,7 +22,6 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
     
-    /* Configurações básicas de fonte do aplicativo */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
     }
@@ -31,7 +30,6 @@ st.markdown("""
         font-weight: 700;
     }
     
-    /* Degradê de título elegante */
     .hero-title {
         background: linear-gradient(135deg, #00e5ff 0%, #7c4dff 100%);
         -webkit-background-clip: text;
@@ -47,7 +45,6 @@ st.markdown("""
         margin-bottom: 30px;
     }
     
-    /* Card Glassmorphic Premium */
     .glass-card {
         background: rgba(255, 255, 255, 0.03);
         backdrop-filter: blur(12px);
@@ -66,7 +63,6 @@ st.markdown("""
         transform: translateY(-3px);
     }
     
-    /* Badges de Compatibilidade */
     .badge-fit {
         background: rgba(46, 213, 115, 0.12);
         color: #2ed573;
@@ -91,7 +87,6 @@ st.markdown("""
         box-shadow: 0 0 10px rgba(255, 71, 87, 0.05);
     }
     
-    /* Badges de Habilidades */
     .skill-badge-present {
         background: rgba(0, 229, 255, 0.1);
         color: #00e5ff;
@@ -118,7 +113,6 @@ st.markdown("""
         font-weight: 500;
     }
     
-    /* Círculo do Score de Match */
     .score-circle {
         width: 60px;
         height: 60px;
@@ -132,7 +126,6 @@ st.markdown("""
         margin-right: 15px;
     }
     
-    /* Estilos do Rodapé */
     .footer-text {
         text-align: center;
         color: #747d8c;
@@ -144,7 +137,7 @@ st.markdown("""
 
 # Função auxiliar para pegar o total de vagas salvas
 def get_total_jobs():
-    init_db() # Garante que o BD está inicializado
+    init_db()
     conn = sqlite3.connect(config.DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM jobs")
@@ -155,36 +148,54 @@ def get_total_jobs():
 # ---- SIDEBAR ----
 with st.sidebar:
     st.image("https://img.icons8.com/nolan/96/artificial-intelligence.png", width=70)
-    st.title("Configurações & Scraper")
+    st.title("AI Vagas - Filtros")
     
     st.markdown("---")
     
-    st.subheader("Coletor de Vagas")
-    kw_input = st.text_input("Termos de busca (separados por vírgula)", value=", ".join(config.DEFAULT_KEYWORDS))
-    loc_input = st.text_input("Localidade da vaga", value=config.LINKEDIN_LOCATION)
-    limit_input = st.number_input("Máximo de vagas para coletar", min_value=1, max_value=100, value=config.MAX_JOBS_TO_SCRAPE)
+    # 🔍 Seção de Filtros para triagem
+    st.subheader("🔍 Filtros de Vagas")
     
-    btn_scrape = st.button("🚀 Buscar Novas Vagas", use_container_width=True)
+    filter_title = st.text_input("Título do Cargo", placeholder="Ex: Machine Learning")
+    filter_location = st.text_input("Localização", placeholder="Ex: Brasil ou Remoto")
+    filter_company = st.text_input("Empresa", placeholder="Ex: Google")
     
-    if btn_scrape:
-        with st.spinner("Conectando ao LinkedIn e coletando vagas..."):
-            try:
-                # Divide palavras-chave em uma lista
-                keywords_list = [kw.strip() for kw in kw_input.split(",")]
-                total_collected = 0
-                for kw in keywords_list:
-                    # Roda o scraper para cada keyword
-                    total_collected += scrape_jobs(kw, loc_input, limit_input)
-                
-                st.success(f"Busca concluída! {total_collected} novas vagas foram salvas/atualizadas no banco.")
-            except Exception as e:
-                st.error(f"Erro ao executar scraper: {e}")
-                
+    filter_work_type = st.selectbox(
+        "Modelo de Trabalho",
+        ["Todos", "Full-time", "Part-time", "Contract", "Temporary", "Internship", "Remote", "Hybrid", "On-site"]
+    )
+    
+    filter_experience_level = st.selectbox(
+        "Nível de Experiência",
+        ["Todos", "Internship", "Entry level", "Associate", "Mid-Senior level", "Director", "Executive"]
+    )
+    
+    st.markdown("---")
+    
+    # 📂 Importador de base Kaggle
+    st.subheader("📂 Importador de Vagas")
+    csv_path_input = st.text_input("Caminho do CSV Kaggle", value=str(config.KAGGLE_CSV_PATH))
+    
+    btn_import = st.button("📥 Importar Vagas do CSV", use_container_width=True)
+    if btn_import:
+        if not Path(csv_path_input).exists():
+            st.error(f"Arquivo não localizado em: {csv_path_input}. Garanta que baixou a base do Kaggle e colocou os dados na pasta do projeto.")
+        else:
+            with st.spinner("Importando base de vagas para o SQLite local..."):
+                try:
+                    # Importa um limite para não travar em processamentos longos no Streamlit
+                    result = import_kaggle_csv(csv_path_input, chunk_size=5000, max_rows=50000)
+                    if result["status"] == "success":
+                        st.success(result["message"])
+                    else:
+                        st.error(result["message"])
+                except Exception as e:
+                    st.error(f"Erro ao importar: {e}")
+                    
     st.markdown("---")
     
     # Exibe estatísticas da base de dados local
     total_jobs = get_total_jobs()
-    st.metric("Vagas Cadastradas no Banco", total_jobs)
+    st.metric("Vagas no Banco SQLite", total_jobs)
     
     if not GEMINI_AVAILABLE:
         st.warning("⚠️ Chave GEMINI_API_KEY ausente. Usando processamento local simples.")
@@ -193,7 +204,7 @@ with st.sidebar:
 
 # ---- CORPO PRINCIPAL ----
 st.markdown('<div class="hero-title">AI Vagas</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-subtitle">Calcule o score de compatibilidade do seu perfil com vagas brasileiras no LinkedIn</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-subtitle">Mapeamento de Aderência e Análise de Skills contra Vagas Reais (Kaggle/HuggingFace)</div>', unsafe_allow_html=True)
 
 # Layout do Currículo
 col1, col2 = st.columns([1, 1])
@@ -207,7 +218,6 @@ with col1:
     if upload_method == "Upload de PDF":
         uploaded_file = st.file_uploader("Selecione o arquivo PDF do currículo", type=["pdf"])
         if uploaded_file is not None:
-            # Salva arquivo temporário para leitura
             temp_pdf_path = Path("temp_resume.pdf")
             with open(temp_pdf_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
@@ -216,7 +226,6 @@ with col1:
                 try:
                     resume_text = extract_text_from_pdf(str(temp_pdf_path))
                     st.success("Currículo em PDF lido com sucesso!")
-                    # Deleta o arquivo temporário
                     temp_pdf_path.unlink()
                 except Exception as e:
                     st.error(f"Erro ao extrair texto do PDF: {e}")
@@ -226,12 +235,12 @@ with col1:
 with col2:
     st.subheader("💡 Como Funciona?")
     st.markdown("""
-    1. **Coleta de Vagas**: O scraper busca vagas recentes no LinkedIn (Brasil) sem expor sua conta pessoal. Configure na barra lateral e clique em **Buscar Novas Vagas**.
-    2. **Busca Semântica**: O sistema compara os vetores (embeddings) do seu currículo com todas as descrições de vagas no banco local para selecionar as melhores oportunidades.
-    3. **Análise de Aderência**: A inteligência artificial estuda as vagas finalistas detalhadamente, avaliando se você tem **Fit** ou **No Fit**, apontando as competências que você já tem e as **skills faltantes** para cada cargo.
+    1. **Filtros de Vagas**: Defina restrições na barra lateral (como cargo, localização ou tipo de trabalho) para delimitar as vagas da base estática do Kaggle a serem avaliadas.
+    2. **Busca Semântica**: O currículo é processado e cruzado (embeddings/TF-IDF) com as vagas selecionadas para ranquear as Top-5 compatíveis.
+    3. **Análise de Fit (IA)**: A IA calcula a porcentagem de compatibilidade, classifica como **Fit** ou **No Fit**, mapeia suas competências presentes e aponta as **skills faltantes** necessárias para o cargo.
     """)
     
-    st.info("💡 **Dica**: Garanta que seu currículo possua detalhes sobre projetos, linguagens e frameworks para obter um score mais acurado.")
+    st.info("💡 **Aviso**: O sistema utiliza a base estática do Kaggle. Se você ainda não importou o CSV principal de 124 mil vagas, o banco funcionará em modo demonstração com vagas reais de exemplo.")
 
 st.markdown("---")
 
@@ -241,21 +250,31 @@ if resume_text:
     
     if btn_match:
         if get_total_jobs() == 0:
-            st.warning("O banco de dados está vazio. Por favor, execute a busca de vagas na barra lateral antes de cruzar dados.")
+            st.warning("O banco de dados de vagas está vazio. Popule-o primeiro importando o CSV ou rodando o seed_data.")
         else:
             with st.spinner("Analisando vagas compatíveis no banco de dados e calculando scores..."):
+                # Prepara filtros
+                filters = {
+                    "title": filter_title,
+                    "location": filter_location,
+                    "company": filter_company,
+                    "work_type": filter_work_type if filter_work_type != "Todos" else None,
+                    "experience_level": filter_experience_level if filter_experience_level != "Todos" else None
+                }
+                # Remove filtros nulos/vazios
+                filters = {k: v for k, v in filters.items() if v}
+                
                 # Executa o algoritmo de matching
-                matches = match_resume_with_database(resume_text, limit=5)
+                matches = match_resume_with_database(resume_text, limit=5, filters=filters)
                 
                 if not matches:
-                    st.error("Nenhuma vaga encontrada para comparação. Tente rodar o coletor de vagas primeiro.")
+                    st.warning("Nenhuma vaga correspondente encontrada com os filtros aplicados. Tente afrouxar os critérios na barra lateral.")
                 else:
                     st.success("Análise concluída com sucesso! Aqui estão suas Top-5 recomendações:")
                     st.markdown("### 🏆 Top-5 Vagas Recomendadas")
                     
                     # Exibe cada vaga em formato de card premium
                     for idx, match in enumerate(matches):
-                        # Configurações de cores de acordo com a classificação
                         if match['fit_classification'] == "Fit":
                             badge_html = '<span class="badge-fit">FIT ✅</span>'
                             score_color = "#2ed573"
@@ -264,6 +283,12 @@ if resume_text:
                             score_color = "#ff4757"
                             
                         score = match['score_percentage']
+                        
+                        # Extrai metadados do tipo de trabalho / experiência
+                        wt = match.get("work_type", "")
+                        el = match.get("experience_level", "")
+                        meta_details = " — ".join([x for x in [wt, el] if x])
+                        meta_text = f" | {meta_details}" if meta_details else ""
                         
                         # Estrutura HTML do card premium
                         card_html = f"""
@@ -275,7 +300,7 @@ if resume_text:
                                     </div>
                                     <div>
                                         <h3 style="margin: 0; font-size: 1.4rem;">{match['title']}</h3>
-                                        <p style="margin: 3px 0 0 0; color: #a4b0be;"><strong>{match['company']}</strong> — {match['location']}</p>
+                                        <p style="margin: 3px 0 0 0; color: #a4b0be;"><strong>{match['company']}</strong> — {match['location']}{meta_text}</p>
                                     </div>
                                 </div>
                                 <div style="margin-top: 10px;">
@@ -309,7 +334,7 @@ if resume_text:
                             <div style="margin-top: 15px; text-align: right;">
                                 <a href="{match['url']}" target="_blank" style="text-decoration: none;">
                                     <button style="background: linear-gradient(135deg, #7c4dff 0%, #00e5ff 100%); color: white; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;">
-                                        Visualizar Vaga no LinkedIn 🔗
+                                        Visualizar Vaga 🔗
                                     </button>
                                 </a>
                             </div>
