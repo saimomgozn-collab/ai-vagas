@@ -16,8 +16,9 @@ def main():
     resumes = []
     jobs = []
     labels = []
+    job_stack_indices = []
     
-    # skills e cargos
+    # dicionario de skills
     tech_stacks = [
         (["python", "pandas", "numpy", "machine learning", "sql"], ["data scientist", "analista de dados", "cientista de dados"]),
         (["java", "spring boot", "microserviços", "api", "backend"], ["desenvolvedor backend", "engenheiro java", "backend senior"]),
@@ -28,7 +29,7 @@ def main():
     
     random.seed(42)
     
-    # gerando mil amostras
+    # amostras equilibradas geradas
     for _ in range(500):
         # classe um fit
         stack_idx = random.randint(0, len(tech_stacks)-1)
@@ -38,6 +39,7 @@ def main():
         resumes.append(r_text)
         jobs.append(j_text)
         labels.append(1)
+        job_stack_indices.append(stack_idx)
         
         # classe zero nofit
         stack_idx_r = random.randint(0, len(tech_stacks)-1)
@@ -47,28 +49,24 @@ def main():
         resumes.append(r_text)
         jobs.append(j_text)
         labels.append(0)
+        job_stack_indices.append(stack_idx_j)
 
     # inserindo ruido realista
     for i in range(50):
         labels[i] = 0 if labels[i] == 1 else 1
 
+    # mapeamento de salarios
+    salary_ranges = {
+        0: (10000, 18000),
+        1: (8000, 15000),
+        2: (6000, 12000),
+        3: (12000, 20000),
+        4: (8000, 15000)
+    }
+    
     # gerando salarios base
-    salaries = []
     np.random.seed(42)
-    for job in jobs:
-        job_lower = job.lower()
-        if "data" in job_lower or "dados" in job_lower:
-            salaries.append(np.random.uniform(10000, 18000))
-        elif "java" in job_lower or "spring" in job_lower:
-            salaries.append(np.random.uniform(8000, 15000))
-        elif "react" in job_lower or "frontend" in job_lower:
-            salaries.append(np.random.uniform(6000, 12000))
-        elif "devops" in job_lower or "cloud" in job_lower or "sre" in job_lower:
-            salaries.append(np.random.uniform(12000, 20000))
-        elif "c#" in job_lower or ".net" in job_lower:
-            salaries.append(np.random.uniform(8000, 15000))
-        else:
-            salaries.append(np.random.uniform(8000, 15000))
+    salaries = [np.random.uniform(salary_ranges[idx][0], salary_ranges[idx][1]) for idx in job_stack_indices]
         
     logger.info("Aplicando NLP Avançado: TF-IDF com Bigramas...")
     vectorizer = TfidfVectorizer(max_features=1500, ngram_range=(1, 2))
@@ -77,7 +75,7 @@ def main():
     v_resumes = vectorizer.transform(resumes)
     v_jobs = vectorizer.transform(jobs)
     
-    # diferenca absoluta matriz
+    # feature diferenca absoluta
     X = abs(v_jobs - v_resumes)
     y = np.array(labels)
 
