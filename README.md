@@ -40,3 +40,35 @@ ai-vagas/
     ├── train_production.py # Script responsável por processar o texto e treinar o Random Forest
     ├── seed_data.py      # Scripts iniciais de semente do banco de dados (Carga de mock data)
     └── verify_matcher.py # Script de teste funcional rápido do pipeline em modo de desenvolvimento
+
+🚀 Como Executar o Projeto
+1. Pré-requisitos
+Certifique-se de ter o Python 3.10+ instalado em seu sistema.
+
+2. Clonar e Inicializar o Ambiente
+Configure o ambiente virtual local:
+
+Bash
+# Criar ambiente virtual
+python -m venv .venv
+
+# Ativar ambiente virtual
+# No Windows:
+.venv\Scripts\activate
+# No Linux/Mac:
+source .venv/bin/activate
+
+# Instalar dependências
+pip install -r requirements.txt
+3. Executar o Painel Streamlit
+Como os modelos com 97% de acurácia já estão prontos e salvos na pasta models/, você não precisa treinar nada para ver o sistema funcionar. Basta ligar a interface visual:
+
+Bash
+streamlit run src/app.py
+Acesse no seu navegador: http://localhost:8501.
+
+🧪 Treinamento do Modelo (Opcional)
+Caso queira re-treinar a Inteligência Artificial do zero utilizando a arquitetura de Random Forest e gerar novos arquivos de calibração na pasta models/, execute:
+
+Bash
+python src/train_production.py
