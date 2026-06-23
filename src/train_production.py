@@ -16,7 +16,6 @@ def main():
     resumes = []
     jobs = []
     labels = []
-    salaries = []
     
     # skills e cargos
     tech_stacks = [
@@ -26,20 +25,10 @@ def main():
         (["aws", "docker", "kubernetes", "ci/cd", "terraform", "devops"], ["engenheiro devops", "cloud architect", "sre"]),
         (["c#", ".net", "sql server", "azure", "backend"], ["desenvolvedor .net", "engenheiro de software c#"])
     ]
-
-    # mapeamento de salarios
-    salary_ranges = {
-        0: (10000, 18000),
-        1: (8000, 15000),
-        2: (6000, 12000),
-        3: (12000, 20000),
-        4: (8000, 15000)
-    }
     
     random.seed(42)
-    np.random.seed(42)
     
-    # amostras equilibradas geradas
+    # gerando mil amostras
     for _ in range(500):
         # classe um fit
         stack_idx = random.randint(0, len(tech_stacks)-1)
@@ -49,7 +38,6 @@ def main():
         resumes.append(r_text)
         jobs.append(j_text)
         labels.append(1)
-        salaries.append(np.random.uniform(salary_ranges[stack_idx][0], salary_ranges[stack_idx][1]))
         
         # classe zero nofit
         stack_idx_r = random.randint(0, len(tech_stacks)-1)
@@ -59,11 +47,28 @@ def main():
         resumes.append(r_text)
         jobs.append(j_text)
         labels.append(0)
-        salaries.append(np.random.uniform(salary_ranges[stack_idx_j][0], salary_ranges[stack_idx_j][1]))
 
     # inserindo ruido realista
     for i in range(50):
         labels[i] = 0 if labels[i] == 1 else 1
+
+    # gerando salarios base
+    salaries = []
+    np.random.seed(42)
+    for job in jobs:
+        job_lower = job.lower()
+        if "data" in job_lower or "dados" in job_lower:
+            salaries.append(np.random.uniform(10000, 18000))
+        elif "java" in job_lower or "spring" in job_lower:
+            salaries.append(np.random.uniform(8000, 15000))
+        elif "react" in job_lower or "frontend" in job_lower:
+            salaries.append(np.random.uniform(6000, 12000))
+        elif "devops" in job_lower or "cloud" in job_lower or "sre" in job_lower:
+            salaries.append(np.random.uniform(12000, 20000))
+        elif "c#" in job_lower or ".net" in job_lower:
+            salaries.append(np.random.uniform(8000, 15000))
+        else:
+            salaries.append(np.random.uniform(8000, 15000))
         
     logger.info("Aplicando NLP Avançado: TF-IDF com Bigramas...")
     vectorizer = TfidfVectorizer(max_features=1500, ngram_range=(1, 2))
@@ -89,8 +94,8 @@ def main():
     rec = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
 
-    # regressao para salarios
-    logger.info("Treinando modelo RandomForest Regressor para salarios...")
+    # treinando modelo regressao
+    logger.info("Treinando modelo RandomForest Regressor...")
     X_reg = v_jobs
     y_reg = np.array(salaries)
     X_train_r, X_test_r, y_train_r, y_test_r = train_test_split(X_reg, y_reg, test_size=0.2, random_state=42)
@@ -106,10 +111,11 @@ def main():
     logger.info(f"F1-Score:  {f1:.4f} ({(f1*100):.1f}%)")
     
     print("\n" + "="*55)
-    print(" 📊 RELATÓRIO OFICIAL PARA A BANCA (CLASSIFICATION REPORT)")
+    print(" 📊 RELATÓRIO OFICIAL (CLASSIFICATION REPORT)")
     print("="*55)
     print(classification_report(y_test, y_pred, target_names=["No Fit (0)", "Fit (1)"]))
-    
+
+    # calculando metricas regressao
     mae = mean_absolute_error(y_test_r, y_pred_r)
     rmse = np.sqrt(mean_squared_error(y_test_r, y_pred_r))
     r2 = r2_score(y_test_r, y_pred_r)
@@ -125,6 +131,8 @@ def main():
         pickle.dump(vectorizer, f)
     with open("models/classifier.pkl", "wb") as f:
         pickle.dump(clf, f)
+        
+    # salvando modelo regressao
     with open("models/salary_regressor.pkl", "wb") as f:
         pickle.dump(reg, f)
         
