@@ -1,12 +1,14 @@
 import sqlite3
 import numpy as np
+import os
+import pickle
 from typing import List, Dict, Any, Tuple
 from pypdf import PdfReader
 from loguru import logger
 import config
 
 def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extrai texto bruto de um arquivo PDF."""
+    # extrai texto bruto
     try:
         reader = PdfReader(pdf_path)
         text = ""
@@ -20,7 +22,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         raise ValueError("Não foi possível ler o arquivo PDF.")
 
 def cosine_similarity(v1, v2):
-    """Calcula similaridade de cosseno entre dois vetores."""
+    # calcula produto escalar
     dot_product = np.dot(v1, v2)
     norm_v1 = np.linalg.norm(v1)
     norm_v2 = np.linalg.norm(v2)
@@ -29,7 +31,7 @@ def cosine_similarity(v1, v2):
     return float(dot_product / (norm_v1 * norm_v2))
 
 def calculate_local_similarity(resume_text: str, jobs: List[Dict[str, Any]]) -> List[Tuple[Dict[str, Any], float]]:
-    """Cálculo de similaridade local usando TF-IDF."""
+    # vetorizacao corpus local
     from sklearn.feature_extraction.text import TfidfVectorizer
     
     logger.info("Utilizando TF-IDF local para triagem de similaridade.")
@@ -49,19 +51,44 @@ def calculate_local_similarity(resume_text: str, jobs: List[Dict[str, Any]]) -> 
     return sorted(ranked_jobs, key=lambda x: x[1], reverse=True)
 
 def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> Dict[str, Any]:
-    """Realiza análise detalhada da vaga em relação ao currículo usando heurísticas locais."""
-    logger.info(f"Gerando análise local para a vaga {job['id']}.")
+    # analise vaga ml
+    logger.info(f"Gerando analise local para a vaga {job['id']}.")
     
-    # Heurística de Fit/No Fit (limiar calibrado localmente com o dataset)
+    model_path = "models/classifier.pkl"
+    vec_path = "models/vectorizer.pkl"
+    
+    # fallback heuristico padrao
     classification = "Fit" if score_est >= 0.08 else "No Fit"
-    score_percentage = int(min(max(score_est * 500, 5), 98)) # Mapeia score local para escala 0-100
+    score_percentage = int(min(max(score_est * 500, 5), 98))
+    justification = f"Esta e uma analise baseada em similaridade de palavras-chave. O candidato possui afinidade aproximada de {score_percentage}%."
     
-    # Obtém as competências associadas à vaga (se existirem no banco)
+    # tenta predicao ml
+    if os.path.exists(model_path) and os.path.exists(vec_path):
+        try:
+            with open(vec_path, "rb") as f:
+                vec = pickle.load(f)
+            with open(model_path, "rb") as f:
+                clf = pickle.load(f)
+                
+            v_res = vec.transform([resume_text])
+            v_job = vec.transform([job['description']])
+            feat = abs(v_job - v_res)
+            
+            pred = clf.predict(feat)[0]
+            prob = clf.predict_proba(feat)[0][1]
+            
+            classification = "Fit" if pred == 1 else "No Fit"
+            score_percentage = int(prob * 100)
+            score_percentage = min(max(score_percentage, 1), 99)
+            justification = f"Analise de machine learning. O modelo preditivo identificou {score_percentage}% de probabilidade de aderencia ao cargo."
+        except Exception as e:
+            logger.error(f"erro predicao: {e}")
+            
+    # busca de competencias
     job_skills_str = job.get('skills', '')
     if job_skills_str:
         skills_ref = [s.strip() for s in job_skills_str.split(",") if s.strip()]
     else:
-        # Fallback para palavras-chave gerais se não houver mapeamento de competências
         possible_kws = ["python", "machine learning", "sql", "aws", "docker", "excel", "spark", "power bi", "scikit-learn", "tensorflow", "react", "typescript", "javascript", "django", "fastapi"]
         job_desc_lower = job['description'].lower()
         skills_ref = [kw.capitalize() for kw in possible_kws if kw in job_desc_lower]
@@ -77,22 +104,21 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
         if not skill_clean:
             continue
         skill_lower = skill_clean.lower()
-        # Busca simples de substring
         if skill_lower in resume_lower:
             skills_present.append(skill_clean)
         else:
             skills_missing.append(skill_clean)
             
-    # Define as dicas de melhoria dinamicamente com base nas skills faltantes
+    # dicas de melhoria
     if skills_missing:
         tips = [
-            f"Adicione palavras-chave como {', '.join(skills_missing[:3])} ao seu currículo se tiver experiência.",
-            "Revise a descrição da vaga para mapear requisitos adicionais."
+            f"Adicione palavras-chave como {', '.join(skills_missing[:3])} ao seu curriculo se tiver experiencia.",
+            "Revise a descricao da vaga para mapear requisitos adicionais."
         ]
     else:
         tips = [
-            "Parabéns! Seu currículo cobre as principais competências técnicas identificadas nesta vaga.",
-            "Revise a descrição da vaga para mapear requisitos adicionais de soft skills ou certificações."
+            "Parabens! Seu curriculo cobre as principais competencias tecnicas identificadas nesta vaga.",
+            "Revise a descricao da vaga para mapear requisitos adicionais de soft skills ou certificações."
         ]
         
     return {
@@ -106,18 +132,17 @@ def analyze_top_job(resume_text: str, job: Dict[str, Any], score_est: float) -> 
         "fit_classification": classification,
         "score_percentage": score_percentage,
         "skills_present": skills_present if skills_present else ["Habilidades gerais"],
-        "skills_missing": skills_missing if skills_missing else ["Nenhuma habilidade crítica ausente detectada"],
-        "justification": f"Esta é uma análise gerada localmente. O candidato possui afinidade aproximada de {score_percentage}% com as palavras-chave da vaga.",
+        "skills_missing": skills_missing if skills_missing else ["Nenhuma habilidade critica ausente detectada"],
+        "justification": justification,
         "improvement_tips": tips
     }
 
 def match_resume_with_database(resume_text: str, limit: int = 5, filters: dict = None) -> List[Dict[str, Any]]:
-    """Carrega as vagas do banco filtradas, faz a triagem inicial e gera a análise detalhada das top N."""
+    # conecta banco dados
     conn = sqlite3.connect(config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # Constrói query SQL dinâmica com base nos filtros aplicados, integrando competências oficiais
     query = """
         SELECT j.id, j.title, j.company, j.location, j.description, j.url, j.work_type, j.experience_level, s.skills
         FROM jobs j
@@ -154,13 +179,12 @@ def match_resume_with_database(resume_text: str, limit: int = 5, filters: dict =
     jobs = [dict(row) for row in rows]
     logger.info(f"Iniciando cruzamento com {len(jobs)} vagas filtradas no banco de dados.")
     
-    # 1. Triagem rápida (calcula score de similaridade para todas)
+    # triagem rapida cosseno
     ranked_jobs = calculate_local_similarity(resume_text, jobs)
     
-    # 2. Pega as top N vagas
     top_matches = ranked_jobs[:limit]
     
-    # 3. Realiza a análise detalhada para cada uma das Top N
+    # analise detalhada ml
     detailed_analyses = []
     for job, score_est in top_matches:
         analysis = analyze_top_job(resume_text, job, score_est)

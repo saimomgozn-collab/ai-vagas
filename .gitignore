@@ -4,12 +4,12 @@
 # Ignorar ambiente virtual do Python
 .venv/
 
-# Cache do Python
-__pycache__/
+# Cache do Python (o **/ garante que ignora em todas as subpastas)
+**/__pycache__/
 *.pyc
 
-# Banco de dados local com vagas
-data/*.db
+# Banco de dados local com vagas (Remova ou comente a linha abaixo se seu vagas.db estiver na pasta data/ e você quiser enviá-lo)
+# data/*.db
 
 # Datasets gigantes (CSV e Parquet)
 data/*.csv
