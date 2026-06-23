@@ -71,4 +71,3 @@ ai-vagas/
     ├── matcher.py        # Motor de matching local que conecta o currículo ao banco via IA
     ├── train_production.py # Pipeline de ML para processar texto e treinar o Random Forest
     ├── seed_data.py      # Scripts iniciais de semente do banco de dados (Carga de mock data)
-    └── verify_matcher.py # Script de teste funcional rápido do pipeline em modo de desenvolvimento
