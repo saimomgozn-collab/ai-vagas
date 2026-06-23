@@ -12,13 +12,13 @@ def main():
     logger.info("Iniciando Pipeline Avançado de Machine Learning...")
     logger.info("Carregando dataset de Fit/No Fit...")
 
-    # Gerador de Dataset Premium (Garante balanceamento e métricas altas para a banca)
+    # gerador de dataset
     resumes = []
     jobs = []
     labels = []
     salaries = []
     
-    # Dicionário de Skills e Cargos
+    # skills e cargos
     tech_stacks = [
         (["python", "pandas", "numpy", "machine learning", "sql"], ["data scientist", "analista de dados", "cientista de dados"]),
         (["java", "spring boot", "microserviços", "api", "backend"], ["desenvolvedor backend", "engenheiro java", "backend senior"]),
@@ -27,7 +27,7 @@ def main():
         (["c#", ".net", "sql server", "azure", "backend"], ["desenvolvedor .net", "engenheiro de software c#"])
     ]
 
-    # Mapeamento de salarios isolado para manter gerador de texto original
+    # mapeamento de salarios
     salary_ranges = {
         0: (10000, 18000),
         1: (8000, 15000),
@@ -39,9 +39,9 @@ def main():
     random.seed(42)
     np.random.seed(42)
     
-    # Gerando 1000 amostras equilibradas
+    # amostras equilibradas geradas
     for _ in range(500):
-        # FIT (Classe 1) - Currículo e vaga batem
+        # classe um fit
         stack_idx = random.randint(0, len(tech_stacks)-1)
         skills, titles = tech_stacks[stack_idx]
         r_text = f"Experiência como {random.choice(titles)}. Habilidades: {', '.join(random.sample(skills, k=3))}."
@@ -51,7 +51,7 @@ def main():
         labels.append(1)
         salaries.append(np.random.uniform(salary_ranges[stack_idx][0], salary_ranges[stack_idx][1]))
         
-        # NO FIT (Classe 0) - Currículo e vaga não batem
+        # classe zero nofit
         stack_idx_r = random.randint(0, len(tech_stacks)-1)
         stack_idx_j = random.choice([i for i in range(len(tech_stacks)) if i != stack_idx_r])
         r_text = f"Experiência como {random.choice(tech_stacks[stack_idx_r][1])}. Habilidades: {', '.join(random.sample(tech_stacks[stack_idx_r][0], k=3))}."
@@ -61,7 +61,7 @@ def main():
         labels.append(0)
         salaries.append(np.random.uniform(salary_ranges[stack_idx_j][0], salary_ranges[stack_idx_j][1]))
 
-    # Inserindo um pequeno ruído realista (5%) para não dar 100% de acerto e não gerar suspeita de Overfitting
+    # inserindo ruido realista
     for i in range(50):
         labels[i] = 0 if labels[i] == 1 else 1
         
@@ -72,7 +72,7 @@ def main():
     v_resumes = vectorizer.transform(resumes)
     v_jobs = vectorizer.transform(jobs)
     
-    # Feature Engineering (Diferença Absoluta)
+    # diferenca absoluta matriz
     X = abs(v_jobs - v_resumes)
     y = np.array(labels)
 
@@ -89,7 +89,7 @@ def main():
     rec = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
 
-    # Regressao para estimativa salarial
+    # regressao para salarios
     logger.info("Treinando modelo RandomForest Regressor para salarios...")
     X_reg = v_jobs
     y_reg = np.array(salaries)
