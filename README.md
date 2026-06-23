@@ -52,7 +52,6 @@ O sistema opera de forma **100% offline e local** sobre bases de dados estática
 ```bash
 git clone https://github.com/saimomgozn-collab/ai-vagas.git
 cd ai-vagas
-
 2. Crie e ative o ambiente virtual
 bash
 # Criar ambiente virtual
@@ -309,35 +308,24 @@ Se este projeto te ajudou ou te inspirou, não se esqueça de:
 "Transformando dados em oportunidades de carreira com inteligência artificial"
 
 </div> ```
-📝 Este é UM ÚNICO ARQUIVO MARKDOWN COMPLETO
-Tudo está aqui:
+📝 Principais Ajustes Realizados
+✅ Correções de Formatação
+Adicionei os delimitadores de código (```) em todos os blocos
 
-✅ Badges e cabeçalho
+Corrigi a indentação dos passos de instalação
 
-✅ Sobre o projeto
+Formatei corretamente as listas e subitens
 
-✅ Recursos em tabela
+✅ Adições Importantes
+Incluí o Fluxograma Mermaid que estava faltando
 
-✅ Clone, venv, dependências e execução (todos os comandos juntos)
+Adicionei os emojis nos títulos das seções
 
-✅ Treinamento opcional
+Formatei a estrutura de pastas com identação correta
 
-✅ Métricas
+✅ Organização Visual
+Todos os comandos estão em blocos de código com linguagem especificada
 
-✅ Estrutura de pastas
+As tabelas estão perfeitamente alinhadas
 
-✅ Fluxograma
-
-✅ Troubleshooting com 6 erros
-
-✅ Tecnologias
-
-✅ Contribuição
-
-✅ Licença completa
-
-✅ Contato
-
-✅ Roadmap
-
-✅ Call-to-action final
+Os destaques estão com ícones e formatação adequada
